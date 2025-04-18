@@ -22,7 +22,6 @@ wheels/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
 
 # IDE
 .idea/
@@ -41,5 +40,4 @@ Thumbs.db
 
 # Project specific
 *.csv
-*.pdf
 *.log 
