@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Time-Optimal NV Spin Control
 
 ## 프로젝트 개요
@@ -87,3 +88,7 @@ jupyter notebook code/NvSpinControl/PathVisualization.ipynb
 MIT License
 
 Copyright (c) 2023 Kim Gyuwon 
+=======
+# kist_nv_spin_control
+single nv-spin 제어 최적화 연구 수행. A*알고리즘을 통한 최적화 알고리즘 개발.
+>>>>>>> e8f12154239cd18f18b6e7b297e231351294c5f5
