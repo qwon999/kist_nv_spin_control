@@ -1,0 +1,176 @@
+# 슈고로 랜덤 target에 대한 최적화 값을 얻고 csv로 저장
+
+
+from math import *
+import numpy as np
+from scipy.linalg import expm
+from qutip import *
+import random
+from scipy import optimize
+from datetime import datetime
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.linalg import fractional_matrix_power
+from sklearn.feature_extraction.text import CountVectorizer
+from scipy import linalg
+from qutip import bloch
+import matplotlib.pyplot as plt
+
+
+time_start = time.time()
+
+# complex number
+j = (-1)**0.5
+ 
+
+# pauli matrix
+sx = np.array([[0, 1], [1, 0]])
+sy = np.array([[0, -j], [j, 0]])
+sz = np.array([[1, 0], [0, -1]])
+s0 = np.array([[1, 0], [0, 1]])
+
+# Detunning Factor
+d0 = 0.15
+v0 = 0.02
+
+def Rx(t):
+    w = 0.02 #gate도 결국 pulse의 시간에 의해서 결정. 단위시간 당 0.02radian변화하도록 설정
+    theta = w*t
+    return np.matrix([[cos(theta/2),     -1j*sin(theta/2)],
+                    [-1j*sin(theta/2),     cos(theta/2)]])
+
+
+
+def Rxm(t):
+    w = 0.02 
+    theta = -w*t
+    return np.matrix([[cos(theta/2),     -1j*sin(theta/2)],
+                    [-1j*sin(theta/2),     cos(theta/2)]])
+
+
+
+def Rz(t): # Rz는 사용하지 않음. 해밀토니안에 의한 회전으로만 컨트롤
+    w = 1
+    phi = w*t
+    return np.matrix([[cos(phi/2)-1j*sin(phi/2),       0],
+                     [0,                          cos(phi/2)+1j*sin(phi/2)]])
+                     
+
+def instant_hamiltionian(choice):
+    choice_list = [0,1,-1] # x-rotiation 방향 선택
+    Ham = (d0*sz+v0*choice_list[choice]*sx)
+    return Ham
+
+def make_unitary(Ham,dt) : 
+    eigvals = np.linalg.eigh(Ham)[0]
+    eigvecs = 1*np.linalg.eigh(Ham)[1]
+    E = np.diag(eigvals)
+    U_H = eigvecs.conj().T
+    U_e = U_H.conj().T @ expm(-j*E*dt) @ U_H
+    return U_e
+
+def unitary(dt, choice) :
+    choice = int(choice)
+    choice_list = [0,1,-1] # x-rotiation 방향 선택
+    Ham = (d0*sz+v0*choice_list[choice]*sx)
+    eigvals = np.linalg.eigh(Ham)[0]
+    eigvecs = 1*np.linalg.eigh(Ham)[1]
+    E = np.diag(eigvals)
+    U_H = eigvecs.conj().T
+    U_e = U_H.conj().T @ expm(-j*E*dt) @ U_H
+    return U_e
+
+
+def state_fidelity(rho_1, rho_2): #fidelity
+        if np.shape(rho_1) != np.shape(rho_2):
+            print("Dimensions of two states do not match.")
+            return 0
+        else:
+            sqrt_rho_1 = fractional_matrix_power(rho_1, 1 / 2)
+            fidelity = np.trace(fractional_matrix_power(sqrt_rho_1 @ rho_2 @ sqrt_rho_1, 1 / 2)) ** 2
+            return np.real(fidelity)
+        
+#어차피 처음 gate choice는 0이 될 수 없으므로, 예외처리 하지않음.
+
+def ten_to_three (gate):
+    gate_choice = []
+
+    while gate != 0  :
+        gate_choice.append(gate%3)
+        gate //= 3
+
+    return gate_choice[::-1]
+
+init_wave = np.array([[1],[0]])
+irho_init = np.kron(init_wave,init_wave.conj().T)
+
+
+cost=1
+
+def problem(vari):
+    #print(vari)
+
+    total_U = s0
+    for j in vari: #추후 속도 향상위해서, dt에 따른 instant_U 값 구해놓고 계산.
+        j = floor(j)
+        #print(j)
+        instant_U = unitary(10, j)
+        total_U = instant_U @ total_U
+    irho_final = total_U @ irho_init @total_U.conj().T
+    
+    F = state_fidelity(irho_target,irho_final)
+
+    #if F > 0.95 : 
+
+    # cost = 1-state_fidelity(target_U,total_U) + 0.0025*vari[0]*len(gate_choice)
+    cost = 1 - F 
+    #print("line 128",vari, cost)
+    return cost
+
+# for t in range(1) : 
+#     vari = [1, 1]
+#     bounds = [(1,10),(1,9999)]
+#     integer_idx=[1]
+#     integer_bounds = [(1,9999) for _ in integer_idx]
+#     options = {'integer_variables': {'indices': integer_idx, 'bounds': integer_bounds},'xtol':1e-15,'ftol':1e-17 }
+#     rlt = optimize.shgo(problem,bounds=bounds,iters=4,options=options)
+#     print(rlt['x'],rlt['nfev'],rlt['fun'])
+
+output = []
+count = 1
+for t in range(count) : 
+    #target_theta,target_phi = (pi/180)*random.uniform(0,180), (pi/180)*random.uniform(0,360)
+    target_theta,target_phi = pi/7,pi/7
+    target_U = Rz(target_phi/0.02) @ Rx(target_theta/0.02) 
+    irho_target = target_U @ irho_init @ target_U.conj().T
+    cost = 1
+    lenn = 1
+    action = True
+    while action == True:
+        
+        vari = [0]*lenn
+        bounds = [(0,2)]*lenn
+        # integer_constraint = lambda x: np.all(np.mod(x, 1).astype(bool))  # ensure x is integer
+        # constraints = [{'type': 'ineq', 'fun': integer_constraint}]
+        rlt = optimize.shgo(problem,bounds=bounds,iters=3, options={'xtol':1e-15,'ftol':1e-15})
+        for i in range(lenn):
+            rlt['x'][lenn-1] = floor(rlt['x'][lenn-1]) #rounding
+        output.append(['SHGO',lenn,target_theta,target_phi,rlt['x'],cost, rlt['nfev'],rlt['fun']])
+        print(rlt['nfev'], rlt['fun'],lenn)
+        lenn+=1
+        if rlt['fun'] < 0.01 : 
+            action = False
+        print(action)
+
+date = datetime.now()
+printdate = date.strftime('%Y%m%d_%H%M%S')
+print(date)
+fin1 = pd.DataFrame(output)
+fin1.rename(columns={0:"Case", 1:'gate lenght', 2:'Theta', 3: 'Phi', 4: 'combination', 5: 'cost', 6: 'nfev', 7:'fun'}, inplace=True)
+fin1.to_csv("/Users/qwon/Documents/DataSetForNVSpin/BySHGO" + printdate + '.csv', index=False)   
+
+
+time_end = time.time()
+
+print("#success# \nTime : " + str(time_end - time_start)) 
