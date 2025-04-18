@@ -84,10 +84,8 @@ jupyter notebook code/NvSpinControl/PathVisualization.ipynb
 ## 참고 문헌
 자세한 참고 문헌 목록은 `docs/references/papers.md`에서 확인할 수 있습니다.
 
-## 라이센스
-MIT License
 
-Copyright (c) 2023 Kim Gyuwon 
+Copyright (c) 2023 Ha Gyuwon 
 =======
 # kist_nv_spin_control
 single nv-spin 제어 최적화 연구 수행. A*알고리즘을 통한 최적화 알고리즘 개발.
